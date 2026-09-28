@@ -107,3 +107,19 @@ test("timeline declarations must name dated facts and an exact source cell", () 
   falseSource.timelineConstraints[0].sourceCells[0].sourceText = "Invented dependency";
   assert.throws(() => validateScenario(falseSource), /source cell/);
 });
+
+test("a one-letter slip in unannotated prose is flagged as a near miss in that file", () => {
+  const draft = structuredClone(acquisitionScenario);
+  draft.arms.narrative.artifacts.find(item => item.id === "access").body += " Maya Chin will confirm the date.";
+  assert.deepEqual(lint(draft).nearMisses, [{
+    code: "NEAR_MISS_VALUE", armId: "narrative", artifactId: "access", text: "Maya Chin", closestTo: "Maya Chen",
+    factIds: ["project-lead", "revenue-owner", "handoff-owner"]
+  }]);
+});
+
+test("possessives and exact names are not near misses", () => {
+  assert.deepEqual(lintScenario(acquisitionScenario).nearMisses, []);
+  const draft = structuredClone(acquisitionScenario);
+  draft.arms.narrative.artifacts.find(item => item.id === "access").body += " Maya Chen’s notes follow.";
+  assert.deepEqual(lint(draft).nearMisses, []);
+});

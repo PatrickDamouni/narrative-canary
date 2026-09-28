@@ -33,10 +33,21 @@ export interface UncheckedReference {
   readonly factId: string;
 }
 
+/** Text in a file that is one or two letters away from a canonical name or phrase, without being it. */
+export interface NearMiss {
+  readonly code: "NEAR_MISS_VALUE";
+  readonly armId: ArmId;
+  readonly artifactId: string;
+  readonly text: string;
+  readonly closestTo: string;
+  readonly factIds: readonly string[];
+}
+
 export interface LintReport {
   readonly findings: readonly AssuranceFinding[];
   readonly timelineFindings: readonly TimelineFinding[];
   readonly uncheckedReferences: readonly UncheckedReference[];
+  readonly nearMisses: readonly NearMiss[];
   readonly literalChecks: number;
   readonly tableChecks: number;
   readonly timelineChecks: number;
@@ -128,6 +139,56 @@ function uncheckedReferences(scenario: Scenario): UncheckedReference[] {
   ));
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function editDistance(left: string, right: string): number {
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= left.length; i += 1) {
+    const current = [i];
+    for (let j = 1; j <= right.length; j += 1) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (left[i - 1] === right[j - 1] ? 0 : 1));
+    }
+    previous = current;
+  }
+  return previous[right.length];
+}
+
+// Possessives are correct usage ("Project Lantern's"), not spelling slips.
+const words = (text: string): string[] => text.split(/\s+/)
+  .map(word => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").replace(/['’]s$/u, ""))
+  .filter(Boolean);
+
+/**
+ * Finds phrases one or two letters away from a canonical value without matching it: likely slips in
+ * unannotated prose. It compares spelling only; a different but plausible value is not detected.
+ */
+function nearMisses(scenario: Scenario): NearMiss[] {
+  const targets = [...new Set(scenario.facts.map(fact => fact.value))]
+    .filter(value => !ISO_DATE.test(value) && /\p{L}/u.test(value) && value.length >= 6)
+    .map(value => ({ value, key: words(value).join(" ").toLocaleLowerCase("en-US"), size: words(value).length }));
+  const results: NearMiss[] = [];
+  for (const armId of ["baseline", "narrative"] as const) {
+    for (const artifact of scenario.arms[armId].artifacts) {
+      const text = words(`${artifact.title} ${artifact.body.replace(/,/g, " ")}`);
+      const seen = new Set<string>();
+      for (const target of targets) {
+        const allowed = target.key.length >= 12 ? 2 : 1;
+        for (let start = 0; start + target.size <= text.length; start += 1) {
+          const window = text.slice(start, start + target.size).join(" ");
+          const distance = editDistance(window.toLocaleLowerCase("en-US"), target.key);
+          if (distance === 0 || distance > allowed || seen.has(window)) continue;
+          seen.add(window);
+          results.push({
+            code: "NEAR_MISS_VALUE", armId, artifactId: artifact.id, text: window, closestTo: target.value,
+            factIds: scenario.facts.filter(fact => fact.value === target.value).map(fact => fact.id)
+          });
+        }
+      }
+    }
+  }
+  return results;
+}
+
 export function lintScenario(scenario: Scenario): LintReport {
   const artifacts = (["baseline", "narrative"] as const).flatMap(armId => scenario.arms[armId].artifacts);
   const findings = assuranceFindings(scenario);
@@ -136,6 +197,7 @@ export function lintScenario(scenario: Scenario): LintReport {
     findings,
     timelineFindings: timeline,
     uncheckedReferences: uncheckedReferences(scenario),
+    nearMisses: nearMisses(scenario),
     literalChecks: artifacts.reduce((total, artifact) => total + (artifact.literalClaims?.length ?? 0), 0),
     tableChecks: artifacts.reduce((total, artifact) => total + (artifact.tableBindings?.length ?? 0), 0),
     timelineChecks: scenario.timelineConstraints.length,

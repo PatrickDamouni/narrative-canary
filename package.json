@@ -10,7 +10,8 @@
     "test": "node --test --test-isolation=none tests/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "attacker-read": "node scripts/attacker-read.mjs",
-    "start": "node src/server.ts"
+    "start": "node src/server.ts",
+    "benchmark": "node scripts/benchmark.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
