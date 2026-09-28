@@ -3,9 +3,11 @@ import { readFileSync } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { pathToFileURL } from "node:url";
 
+import { plantFlaws, scoreLint } from "./benchmark.ts";
 import { acquisitionScenario } from "./fixtures/acquisition.ts";
 import { flawedScenario } from "./fixtures/flawed.ts";
 import { tripwirePlans } from "./fixtures/tripwire-plans.ts";
+import { lintScenario } from "./lint.ts";
 import { attackerRead } from "./tradecraft.ts";
 
 const asset = (file: string, type: string) => ({ type, body: readFileSync(new URL(`./ui/${file}`, import.meta.url)) });
@@ -58,6 +60,18 @@ function attackerReadFromQuery(query: URLSearchParams): unknown {
   };
 }
 
+/** Deterministic, so it is computed once. Cases are summarized; the planted scenarios stay server-side. */
+function benchmarkSummary(): unknown {
+  const cases = plantFlaws(acquisitionScenario);
+  const score = scoreLint(acquisitionScenario, cases, lintScenario);
+  const missed = new Set(score.byKind.flatMap(row => row.missed));
+  return {
+    cleanFalseAlarms: score.cleanFalseAlarms,
+    byKind: score.byKind.map(({ kind, planted, caught, strayFindings }) => ({ kind, planted, caught, strayFindings })),
+    cases: cases.map(({ id, kind, description }) => ({ id, kind, description, caught: !missed.has(id) }))
+  };
+}
+
 export interface LoopbackServer {
   listen(port: number, host: string, callback: (error?: Error) => void): void;
   close(callback: (error?: Error) => void): void;
@@ -66,6 +80,7 @@ export interface LoopbackServer {
 
 export function createCanaryServer(): { server: LoopbackServer; token: string } {
   const token = randomBytes(32).toString("hex");
+  const benchmark = benchmarkSummary();
 
   function requireToken(request: IncomingMessage): void {
     const supplied = request.headers["x-canary-token"];
@@ -85,6 +100,12 @@ export function createCanaryServer(): { server: LoopbackServer; token: string } 
       if (url.pathname === "/api/attacker-read") {
         requireToken(request);
         json(response, 200, attackerReadFromQuery(url.searchParams));
+        return;
+      }
+      if (url.pathname === "/api/benchmark") {
+        requireToken(request);
+        if ([...url.searchParams.keys()].length > 0) throw new HttpError(400, "The benchmark takes no settings.");
+        json(response, 200, benchmark);
         return;
       }
       throw new HttpError(404, "Not found.");

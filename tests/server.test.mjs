@@ -57,3 +57,19 @@ test("the attacker's read requires the token and rejects unexpected settings", a
   }
   assert.equal((await fetch(`${url(valid)}&plan=vendor-pattern`, { headers })).status, 400, "repeated key");
 });
+
+test("the benchmark results require the token and take no settings", async t => {
+  const { base, token } = await start(t);
+  const headers = { "x-canary-token": token };
+  assert.equal((await fetch(`${base}/api/benchmark`)).status, 403);
+  assert.equal((await fetch(`${base}/api/benchmark?kind=all`, { headers })).status, 400);
+  const result = await (await fetch(`${base}/api/benchmark`, { headers })).json();
+  assert.equal(result.cleanFalseAlarms, 0);
+  assert.equal(result.cases.length, 42);
+  assert.equal(result.cases.filter(item => item.caught).length, 32);
+  assert.deepEqual(result.byKind.map(row => [row.kind, row.caught, row.planted]), [
+    ["anchored-quote-typo", 7, 7], ["worksheet-cell-edit", 12, 12], ["impossible-deadline", 3, 3],
+    ["prose-name-typo", 10, 10], ["prose-wrong-value", 0, 10]
+  ]);
+  assert.ok(result.cases.every(item => typeof item.description === "string" && !("scenario" in item)));
+});

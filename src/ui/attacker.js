@@ -222,6 +222,56 @@ for (const button of document.querySelectorAll("[data-tell]")) button.addEventLi
 linkIsTell.addEventListener("change", () => update({}));
 document.querySelector("#replay").addEventListener("click", () => report && play());
 
+const MISTAKE_LABELS = {
+  "anchored-quote-typo": "Misspelled name or date in an annotated quote",
+  "worksheet-cell-edit": "Edited worksheet cell",
+  "impossible-deadline": "Deadline moved past the date it must precede",
+  "prose-name-typo": "Misspelling slipped into plain prose",
+  "prose-wrong-value": "Wrong but plausible value in prose"
+};
+
+function renderBenchmark(result) {
+  const planted = result.cases.length;
+  const caught = result.cases.filter(item => item.caught).length;
+  document.querySelector("#bench-score").textContent = `${caught} / ${planted}`;
+  document.querySelector("#bench-fa").textContent = String(result.cleanFalseAlarms);
+  const focus = document.querySelector("#bench-focus");
+  const describe = item => `${item.caught ? "✓ Caught" : "✕ Missed"}: ${item.description}`;
+  document.querySelector("#bench-rows").replaceChildren(...result.byKind.map(row => {
+    const line = el("div", "bench-row");
+    const bar = el("div", "bench-bar");
+    bar.setAttribute("role", "img");
+    bar.setAttribute("aria-label", `${row.caught} of ${row.planted} caught`);
+    if (row.caught) { const part = el("span", "caught"); part.style.flex = String(row.caught); bar.append(part); }
+    if (row.planted - row.caught) { const part = el("span", "missed"); part.style.flex = String(row.planted - row.caught); bar.append(part); }
+    const dots = el("div", "dots");
+    for (const item of result.cases.filter(entry => entry.kind === row.kind)) {
+      const dot = el("button", `dot ${item.caught ? "caught" : "missed"}`, item.caught ? "✓" : "✕");
+      dot.type = "button";
+      dot.setAttribute("aria-label", describe(item));
+      const show = () => { focus.textContent = describe(item); };
+      dot.addEventListener("mouseenter", show);
+      dot.addEventListener("focus", show);
+      dot.addEventListener("click", show);
+      dots.append(dot);
+    }
+    line.append(el("span", "bench-label", MISTAKE_LABELS[row.kind] ?? row.kind), bar, el("span", "bench-count", `${row.caught} / ${row.planted}`), dots);
+    return line;
+  }));
+  document.querySelector("#bench-tbody").replaceChildren(...result.cases.map(item => {
+    const tr = el("tr");
+    tr.append(el("td", "", MISTAKE_LABELS[item.kind] ?? item.kind), el("td", "", item.description), el("td", "", item.caught ? "✓ Caught" : "✕ Missed"));
+    return tr;
+  }));
+  document.querySelector("#bench").hidden = false;
+}
+
+async function loadBenchmark(candidate) {
+  const response = await fetch("/api/benchmark", { headers: { "x-canary-token": candidate }, cache: "no-store" });
+  if (!response.ok) throw new Error("The benchmark could not be loaded.");
+  renderBenchmark(await response.json());
+}
+
 async function open(candidate) {
   gateError.hidden = true;
   try {
@@ -231,6 +281,7 @@ async function open(candidate) {
     workspace.hidden = false;
     selected = "cross-checker";
     render();
+    await loadBenchmark(candidate);
   } catch (error) {
     gateError.textContent = error instanceof Error ? error.message : "The attacker's read could not be computed.";
     gateError.hidden = false;

@@ -73,6 +73,34 @@ h1 { font-size: clamp(34px, 5vw, 58px); letter-spacing: -.05em; line-height: 1.0
 .source b { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: var(--good); margin-right: 6px; }
 .source b.assumption { color: var(--tell); }
 .source a { color: #8fd9b6; }
+.bench { margin-top: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+.bench-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 12px 24px; margin-bottom: 20px; }
+.bench h2 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.02em; }
+.bench-sub { margin: 0; color: var(--muted); font-size: 13px; max-width: 560px; line-height: 1.5; }
+.bench .score b { color: var(--text); }
+.bench-rows { display: grid; gap: 10px; }
+.bench-row { display: grid; grid-template-columns: minmax(180px, 280px) minmax(120px, 1fr) 56px auto; grid-template-areas: "label bar count dots"; gap: 14px; align-items: center; }
+.bench-label { grid-area: label; } .bench-bar { grid-area: bar; } .bench-count { grid-area: count; } .dots { grid-area: dots; }
+.bench-label { font-size: 13px; color: var(--text); }
+.bench-bar { display: flex; gap: 2px; height: 14px; }
+.bench-bar span { height: 100%; }
+.bench-bar .caught { background: var(--good); border-radius: 4px 0 0 4px; }
+.bench-bar .missed { background: var(--tell); border-radius: 0 4px 4px 0; }
+.bench-bar span:only-child { border-radius: 4px; }
+.bench-count { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--text); text-align: right; }
+.dots { display: flex; flex-wrap: wrap; gap: 4px; max-width: 260px; }
+.dot { width: 18px; height: 18px; border-radius: 50%; border: 0; padding: 0; font-size: 10px; font-weight: 800; line-height: 18px; text-align: center; color: #062017; }
+.dot.caught { background: var(--good); }
+.dot.missed { background: var(--tell); color: #2a1a00; }
+.dot:hover, .dot:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.bench-focus { min-height: 20px; margin: 16px 0 6px; font-size: 13px; color: var(--text); }
+.k.caught-k { background: var(--good); } .k.missed-k { background: var(--tell); }
+.bench-table { margin-top: 14px; font-size: 12px; color: var(--muted); }
+.bench-table summary { cursor: pointer; color: var(--text); }
+.bench-table table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.bench-table th, .bench-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.bench-table th { color: var(--text); font-weight: 600; }
+.bench-note { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 14px 0 0; }
 .findings { margin-top: 18px; display: grid; gap: 8px; }
 .finding { border-left: 3px solid var(--tell); background: #1d1a10; border-radius: 0 10px 10px 0; padding: 12px 16px; font-size: 13px; color: #f1ddb0; line-height: 1.5; }
 .finding b { color: var(--tell); display: block; font-size: 10px; letter-spacing: .1em; margin-bottom: 3px; }
@@ -87,4 +115,5 @@ footer { color: var(--dim); font-size: 11px; border-top: 1px solid var(--line); 
   .grid { grid-template-columns: 120px repeat(var(--cols), 88px) 82px; }
   .who span:last-child { font-size: 11px; }
   .detail { grid-template-columns: 1fr; }
+  .bench-row { grid-template-columns: 1fr 48px; grid-template-areas: "label count" "bar bar" "dots dots"; gap: 8px; }
 }

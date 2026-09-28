@@ -36,7 +36,7 @@ Underneath, `src/lint.ts` checks declared quotes, worksheet cells, and date rule
 
 ### Planted-flaw benchmark
 
-`npm run benchmark` makes 42 copies of the clean files, each with exactly one planted mistake, and scores whether the lint points at the right file and fact:
+The board shows these results as its own panel: one bar per mistake type and one dot per planted copy (hover a dot to see exactly what was planted). `npm run benchmark` prints the same numbers. It makes 42 copies of the clean files, each with exactly one planted mistake, and scores whether the lint points at the right file and fact:
 
 | Planted mistake | Caught |
 | --- | --- |
