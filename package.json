@@ -1,0 +1,19 @@
+{
+  "name": "narrative-canary",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test --test-isolation=none tests/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "attacker-read": "node scripts/attacker-read.mjs",
+    "start": "node src/server.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "5.9.3"
+  }
+}

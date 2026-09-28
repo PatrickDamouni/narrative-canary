@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Attacker's read · Narrative Canary</title>
+  <link rel="stylesheet" href="/attacker.css">
+  <script src="/attacker.js" defer></script>
+</head>
+<body>
+  <header class="top"><span class="brand"><span class="mark">N</span>Narrative Canary</span><span class="tag">ATTACKER'S READ · FICTIONAL · LOCAL ONLY</span></header>
+  <main>
+    <section class="intro">
+      <h1>Read it without tripping it.</h1>
+      <p>Careful intruders open canary documents in Protected View, or unzip them first, and the beacon never fires. The words still get read. Watch five attacker habits walk the same fictional lure, and see which tripwire catches each one.</p>
+    </section>
+    <section id="gate" class="gate" aria-labelledby="gate-title">
+      <h2 id="gate-title">Open the link the server printed</h2>
+      <p>It carries a one-time local token. Or paste the token here. Everything runs on fixed fictional files.</p>
+      <form id="token-form"><label class="sr" for="token">Local token</label><input id="token" type="password" autocomplete="off" spellcheck="false" required placeholder="local token"><button type="submit">Enter</button></form>
+      <p id="gate-error" class="error" role="alert" hidden></p>
+    </section>
+    <div id="workspace" hidden>
+      <div class="controls">
+        <div class="group"><span class="group-label" id="plan-label">Defender plan</span><div id="plan-options" class="chips" role="group" aria-labelledby="plan-label"></div></div>
+        <div class="group"><span class="group-label" id="files-label">Lure files</span><div class="chips" role="group" aria-labelledby="files-label"><button type="button" data-files="clean" aria-pressed="true">Clean</button><button type="button" data-files="flawed" aria-pressed="false">One name misspelled</button></div></div>
+        <div class="group"><span class="group-label" id="tell-label">Attacker spots a trap</span><div class="chips" role="group" aria-labelledby="tell-label"><button type="button" data-tell="abandon" aria-pressed="true">Leaves</button><button type="button" data-tell="stop-path" aria-pressed="false">Stops, uses what they read</button></div></div>
+        <label class="challenge"><input id="link-is-tell" type="checkbox"> Attackers distrust the workspace link</label>
+      </div>
+      <p id="load-error" class="error" role="alert" hidden></p>
+      <section class="board" aria-labelledby="board-title">
+        <div class="board-head">
+          <h2 id="board-title" class="sr">Attack board</h2>
+          <div class="score"><span id="coverage">–</span><span>attackers caught</span></div>
+          <button id="replay" type="button" class="replay">▶ Replay</button>
+        </div>
+        <div id="grid" class="grid" role="table" aria-label="Attacker walks through the lure"></div>
+        <div class="legend" aria-hidden="true"><span class="k read"></span>read<span class="k fired"></span>tripwire fires<span class="k silent"></span>tripwire silent<span class="k tell"></span>trap spotted / story breaks<span class="k unreached"></span>never reached</div>
+      </section>
+      <section id="detail" class="detail" aria-live="polite"></section>
+      <section id="findings" class="findings" hidden></section>
+      <details class="assumptions"><summary>What this rests on (assumptions, not measurements)</summary><ol id="assumptions"></ol></details>
+    </div>
+  </main>
+  <footer>Modeled from cited public sources and stated assumptions. No real attacker, token, alert, or vendor product is involved. NO DEPLOYED TRAPS OR DELIVERED ALERTS.</footer>
+</body>
+</html>
