@@ -8,6 +8,7 @@ import { acquisitionScenario } from "./fixtures/acquisition.ts";
 import { flawedScenario } from "./fixtures/flawed.ts";
 import { tripwirePlans } from "./fixtures/tripwire-plans.ts";
 import { lintScenario } from "./lint.ts";
+import { latestRun } from "./story/runs.ts";
 import { attackerRead } from "./tradecraft.ts";
 
 const asset = (file: string, type: string) => ({ type, body: readFileSync(new URL(`./ui/${file}`, import.meta.url)) });
@@ -78,7 +79,8 @@ export interface LoopbackServer {
   address(): ReturnType<Server["address"]>;
 }
 
-export function createCanaryServer(): { server: LoopbackServer; token: string } {
+export function createCanaryServer(options: { runsDir?: string } = {}): { server: LoopbackServer; token: string } {
+  const runsDir = options.runsDir ?? "runs";
   const token = randomBytes(32).toString("hex");
   const benchmark = benchmarkSummary();
 
@@ -106,6 +108,12 @@ export function createCanaryServer(): { server: LoopbackServer; token: string } 
         requireToken(request);
         if ([...url.searchParams.keys()].length > 0) throw new HttpError(400, "The benchmark takes no settings.");
         json(response, 200, benchmark);
+        return;
+      }
+      if (url.pathname === "/api/stories") {
+        requireToken(request);
+        if ([...url.searchParams.keys()].length > 0) throw new HttpError(400, "The story results take no settings.");
+        json(response, 200, latestRun(runsDir));
         return;
       }
       throw new HttpError(404, "Not found.");
@@ -137,7 +145,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (!/^\d{1,5}$/.test(requested) || (Number(requested) !== 0 && (Number(requested) < 1024 || Number(requested) > 65535))) {
     throw new Error("NARRATIVE_CANARY_PORT must be 0 or a port from 1024 to 65535.");
   }
-  const { server, token } = createCanaryServer();
+  // Where pilot runs are read from; defaults to ./runs.
+  const { server, token } = createCanaryServer({ runsDir: process.env.NARRATIVE_CANARY_RUNS ?? "runs" });
   server.listen(Number(requested), LOOPBACK, error => {
     if (error) throw error;
     const address = server.address();

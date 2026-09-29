@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import { createCanaryServer } from "../src/server.ts";
 
-async function start(t) {
-  const { server, token } = createCanaryServer();
+async function start(t, options) {
+  const { server, token } = createCanaryServer(options);
   await new Promise((resolve, reject) => server.listen(0, "127.0.0.1", error => error ? reject(error) : resolve()));
   t.after(() => new Promise(resolve => server.close(resolve)));
   const address = server.address();
@@ -72,4 +75,14 @@ test("the benchmark results require the token and take no settings", async t => 
     ["prose-name-typo", 10, 10], ["prose-wrong-value", 0, 10]
   ]);
   assert.ok(result.cases.every(item => typeof item.description === "string" && !("scenario" in item)));
+});
+
+test("story results require the token, take no settings, and report an empty state plainly", async t => {
+  const runsDir = mkdtempSync(path.join(tmpdir(), "nc-server-runs-"));
+  t.after(() => rmSync(runsDir, { recursive: true, force: true }));
+  const { base, token } = await start(t, { runsDir });
+  assert.equal((await fetch(`${base}/api/stories`)).status, 403);
+  const headers = { "x-canary-token": token };
+  assert.equal((await fetch(`${base}/api/stories?run=../..`, { headers })).status, 400);
+  assert.deepEqual(await (await fetch(`${base}/api/stories`, { headers })).json(), { run: null, summary: null, stories: [], skipped: 0 });
 });

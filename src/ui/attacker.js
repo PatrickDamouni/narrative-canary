@@ -272,6 +272,178 @@ async function loadBenchmark(candidate) {
   renderBenchmark(await response.json());
 }
 
+const STATUS = {
+  consistent: { icon: "✓", label: "consistent", css: "st-consistent" },
+  incomplete: { icon: "◐", label: "incomplete", css: "st-incomplete" },
+  contradiction: { icon: "✕", label: "contradiction", css: "st-contradiction" },
+  unsafe: { icon: "⚠", label: "unsafe", css: "st-unsafe" }
+};
+const DOC_LABELS = { kickoff_email: "Kickoff email", scope_memo: "Scope memo", workstream_tracker: "Workstream tracker", status_update: "Status update", handoff_note: "Handoff note" };
+const docLabel = id => DOC_LABELS[id] ?? id;
+
+/** Plain-language line for one checker finding. */
+function describeIssue(issue) {
+  switch (issue.code) {
+    case "CROSS_DOC_CONFLICT": return `Documents disagree on ${issue.key}: ${(issue.observations ?? []).map(item => `“${item.value}” (${docLabel(item.docId)})`).join(" vs ")}.`;
+    case "SHEET_CONFLICT": return `${docLabel(issue.docId)} says “${issue.value}” for ${issue.key}; the fact sheet says “${issue.sheetValue}”.`;
+    case "QUOTE_VALUE_MISMATCH": return `The quote “${issue.quote}” does not say “${issue.value}” (${issue.key}).`;
+    case "NEAR_MISS_NAME": return `“${issue.text}” is one or two letters off “${issue.closestTo}”.`;
+    case "TIMELINE_ORDER": return `${issue.before} (${issue.beforeValue}) must come before ${issue.after} (${issue.afterValue}).`;
+    case "UNACCOUNTED_DATE": return `The date “${issue.text}” matches no stated fact. For a person to review.`;
+    case "UNSAFE_CONTENT": return `Contains a ${issue.kind}. Decoy text must never include one.`;
+    case "UNGROUNDED_QUOTE": return `Claims to quote “${issue.quote}” for ${issue.key}, but that text is not in the document.`;
+    case "UNREADABLE_QUOTE": return `The quote “${issue.quote}” has no complete date for ${issue.key}.`;
+    case "PARTIAL_NAME": return `Uses only “${issue.value}” for ${issue.key}.`;
+    case "INVALID_VALUE": return `${issue.key} value “${issue.value}” is not a valid date.`;
+    case "THIN_COVERAGE": return `${issue.key} appears in only ${issue.documents} document(s); at least two are required.`;
+    case "MISSING_DOCUMENT": return `The ${docLabel(issue.docId)} is missing.`;
+    case "DUPLICATE_DOCUMENT": return `The ${docLabel(issue.docId)} appears twice.`;
+    default: return issue.code;
+  }
+}
+
+/** Issues that point into one document, and the exact text to mark there. */
+function issuesFor(doc, issues) {
+  const quotesOf = key => doc.facts.filter(fact => fact.key === key).map(fact => fact.quote);
+  return issues.flatMap(issue => {
+    if (issue.docId === doc.id) {
+      return [{ issue, needles: [issue.text, issue.quote, ...(issue.code === "SHEET_CONFLICT" ? quotesOf(issue.key) : [])].filter(Boolean) }];
+    }
+    if (issue.code === "CROSS_DOC_CONFLICT" && (issue.observations ?? []).some(item => item.docId === doc.id)) return [{ issue, needles: quotesOf(issue.key) }];
+    return [];
+  });
+}
+
+/** Builds the document text with marked spans, using text nodes only. */
+function markedText(body, marks) {
+  const ranges = [];
+  for (const { needle, unsafe } of marks) {
+    let from = 0;
+    while (needle && (from = body.indexOf(needle, from)) !== -1) {
+      ranges.push([from, from + needle.length, unsafe]);
+      from += needle.length;
+    }
+  }
+  ranges.sort((left, right) => left[0] - right[0]);
+  const nodes = [];
+  let cursor = 0;
+  for (const [start, end, unsafe] of ranges) {
+    if (start < cursor) continue;
+    nodes.push(document.createTextNode(body.slice(cursor, start)), el("mark", unsafe ? "unsafe" : "", body.slice(start, end)));
+    cursor = end;
+  }
+  nodes.push(document.createTextNode(body.slice(cursor)));
+  return nodes;
+}
+
+let storyView = { stories: [], selected: null, doc: "kickoff_email", repaired: false };
+
+function versionButtons(story, showRepaired) {
+  const versions = [["original", false], ...(story.repairedDocuments.length ? [["after repair", true]] : [])];
+  return versions.map(([label, value]) => {
+    const button = el("button", "", label);
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(showRepaired === value));
+    button.addEventListener("click", () => { storyView.repaired = value; renderViewer(); });
+    return button;
+  });
+}
+
+function renderViewer() {
+  const viewer = document.querySelector("#story-viewer");
+  const story = storyView.stories[storyView.selected];
+  if (!story) { viewer.hidden = true; return; }
+  viewer.hidden = false;
+  const showRepaired = storyView.repaired && story.repairedDocuments.length > 0;
+  const documents = showRepaired ? story.repairedDocuments : story.documents;
+  const issues = showRepaired ? story.repairedIssues : story.issues;
+  document.querySelector("#viewer-title").textContent = `${story.seedId} · ${story.condition}${story.failure ? ` · failed: ${story.failure}` : ""}`;
+  document.querySelector("#viewer-version").replaceChildren(...versionButtons(story, showRepaired));
+  document.querySelector("#viewer-tabs").replaceChildren(...documents.map(doc => {
+    const count = issuesFor(doc, issues).length;
+    const tab = el("button", "", `${docLabel(doc.id)}${count ? ` (${count})` : ""}`);
+    tab.type = "button";
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(doc.id === storyView.doc));
+    tab.setAttribute("aria-pressed", String(doc.id === storyView.doc));
+    tab.addEventListener("click", () => { storyView.doc = doc.id; renderViewer(); });
+    return tab;
+  }));
+  const doc = documents.find(item => item.id === storyView.doc) ?? documents[0];
+  const pre = document.querySelector("#viewer-doc");
+  const list = document.querySelector("#viewer-issues");
+  if (!doc) {
+    pre.replaceChildren(document.createTextNode(story.failure ? `No documents: ${story.failure}.` : "No documents."));
+    list.replaceChildren();
+    return;
+  }
+  const local = issuesFor(doc, issues);
+  const marks = local.flatMap(({ issue, needles }) => needles.map(needle => ({ needle, unsafe: issue.severity === "unsafe" })));
+  pre.replaceChildren(el("b", "", `${doc.title}\n\n`), ...markedText(doc.body, marks));
+  const general = issues.filter(issue => !issue.docId && issue.code !== "CROSS_DOC_CONFLICT");
+  const shown = [...local.map(item => item.issue), ...general];
+  list.replaceChildren(...(shown.length ? shown : [null]).map(issue => {
+    if (!issue) return el("li", "minor", "No problems found in this document.");
+    const item = el("li", issue.severity === "unsafe" ? "unsafe" : issue.severity === "contradiction" ? "" : "minor");
+    item.append(el("b", "", issue.severity.toUpperCase()), document.createTextNode(describeIssue(issue)));
+    return item;
+  }));
+}
+
+function conditionCard(row) {
+  const card = el("div", "cond-card");
+  card.append(el("h3", "", row.condition === "fact-sheet" ? "Fact sheet first" : "Free-form"),
+    el("p", "cond-meta", `${row.checked} of ${row.attempted} stories checked${row.failed ? ` · ${row.failed} failed to generate` : ""} · $${Number(row.costUsd).toFixed(2)}`));
+  const bar = el("div", "status-bar");
+  bar.setAttribute("role", "img");
+  bar.setAttribute("aria-label", Object.entries(row.byStatus ?? {}).map(([status, count]) => `${count} ${status}`).join(", "));
+  const counts = el("div", "status-counts");
+  for (const [status, meta] of Object.entries(STATUS)) {
+    const count = row.byStatus?.[status] ?? 0;
+    if (count) { const part = el("span", meta.css); part.style.flex = String(count); bar.append(part); }
+    counts.append(el("span", "", `${meta.icon} ${count} ${meta.label}`));
+  }
+  card.append(bar, counts);
+  if (row.repairAttempted) {
+    card.append(el("p", "cond-meta", `Repairs: ${row.repairedClean} of ${row.repairAttempted} came back consistent${row.repairFailed ? `, ${row.repairFailed} failed` : ""}${row.repairIntroducedNew ? `, ${row.repairIntroducedNew} introduced a new kind of problem` : ""}.`));
+  }
+  return card;
+}
+
+function storyChip(story, index) {
+  const meta = STATUS[story.status] ?? { icon: "–", label: story.failure ? `failed: ${story.failure}` : "unknown", css: "st-incomplete" };
+  const chip = el("button", "story-chip");
+  chip.type = "button";
+  chip.setAttribute("aria-pressed", "false");
+  chip.append(el("span", `dot-s ${meta.css}`, meta.icon), document.createTextNode(`${story.seedId} · ${story.condition === "fact-sheet" ? "sheet" : "free"} · ${meta.label}`));
+  chip.addEventListener("click", () => {
+    storyView.selected = index;
+    storyView.repaired = false;
+    for (const other of document.querySelectorAll(".story-chip")) other.setAttribute("aria-pressed", String(other === chip));
+    renderViewer();
+  });
+  return chip;
+}
+
+function renderStories(result) {
+  document.querySelector("#stories").hidden = false;
+  document.querySelector("#stories-empty").hidden = result.run !== null;
+  document.querySelector("#stories-run").textContent = result.run
+    ? `run ${result.run.slice(0, 10)}${result.skipped ? ` · ${result.skipped} unreadable file(s) skipped` : ""}`
+    : "no run yet";
+  const summaries = Array.isArray(result.summary?.summary) ? result.summary.summary : [];
+  document.querySelector("#stories-summary").replaceChildren(...summaries.map(conditionCard));
+  storyView = { stories: result.stories, selected: null, doc: "kickoff_email", repaired: false };
+  document.querySelector("#stories-list").replaceChildren(...result.stories.map(storyChip));
+  renderViewer();
+}
+
+async function loadStories(candidate) {
+  const response = await fetch("/api/stories", { headers: { "x-canary-token": candidate }, cache: "no-store" });
+  if (!response.ok) throw new Error("The story results could not be loaded.");
+  renderStories(await response.json());
+}
+
 async function open(candidate) {
   gateError.hidden = true;
   try {
@@ -282,6 +454,7 @@ async function open(candidate) {
     selected = "cross-checker";
     render();
     await loadBenchmark(candidate);
+    await loadStories(candidate);
   } catch (error) {
     gateError.textContent = error instanceof Error ? error.message : "The attacker's read could not be computed.";
     gateError.hidden = false;
