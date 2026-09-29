@@ -11,10 +11,15 @@
     "typecheck": "tsc --noEmit",
     "attacker-read": "node scripts/attacker-read.mjs",
     "start": "node src/server.ts",
-    "benchmark": "node scripts/benchmark.mjs"
+    "benchmark": "node scripts/benchmark.mjs",
+    "story-pilot": "node scripts/story-pilot.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "5.9.3"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.129.0",
+    "zod": "^4.6.5"
   }
 }

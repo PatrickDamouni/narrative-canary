@@ -141,7 +141,7 @@ function uncheckedReferences(scenario: Scenario): UncheckedReference[] {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-function editDistance(left: string, right: string): number {
+export function editDistance(left: string, right: string): number {
   let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
   for (let i = 1; i <= left.length; i += 1) {
     const current = [i];
@@ -154,7 +154,7 @@ function editDistance(left: string, right: string): number {
 }
 
 // Possessives are correct usage ("Project Lantern's"), not spelling slips.
-const words = (text: string): string[] => text.split(/\s+/)
+export const words = (text: string): string[] => text.split(/\s+/)
   .map(word => word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").replace(/['’]s$/u, ""))
   .filter(Boolean);
 
